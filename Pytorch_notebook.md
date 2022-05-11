@@ -475,7 +475,7 @@ writer.add_image("Tensor_img", img_tensor, 1)
 writer.close()
 ```
 
-总结：Totensor使用步骤
+**总结：Totensor使用步骤**
 
 ```python
 #导入库
