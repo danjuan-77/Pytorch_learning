@@ -167,7 +167,81 @@ os.listdir(path)#path目录中的全部路径组成的列表
 
 ## Dataloader
 
-为后面的网络提供不同的数据类型
+为后面的网络提供不同的数据类型,就是按照什么样的方式取出数据
+
+```python
+from torch.utils.data import DataLoader
+test_data_loader = DataLoader(test_data, batch_size=64, shuffle=True, num_workers=0, drop_last=True)
+```
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131837565.png" alt="image-20220513183758484" style="zoom:50%;" />
+
+几个重要的参数解释：
+
+* data数据集
+* batch_size=表示每次取出多少个图片
+* shuffle=True表示从数据集把所有数据取出来之后，下次取数据就会将所有数据打乱再去取，相当于洗牌
+* num_workers表示进程数量，默认是0，表示只用主进程
+* drop_last=True表示如果图片数量不能整除你的batch_size就不会将多余的图片取出来：如下图
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131831390.png" alt="image-20220513183131327" style="zoom: 50%;" />
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131832387.png" alt="image-20220513183226309" style="zoom: 50%;" />
+
+普通的tensor数据类型的image：
+
+```python
+# test_data中的第一张照片
+image, target = test_data[0]
+print(image)
+print(image.shape)  # torch.Size([3, 32, 32])
+print(target) # 3
+```
+
+而dataloader得到的每个返回对象是一个batch_size数量的图片的集合
+
+```python
+print(images.shape)  # torch.Size([4, 3, 32, 32]) 4表示一个batch里面有四张照片
+print(targets)  # tensor([6, 4, 7, 0])
+```
+
+完整的一个代码：
+
+```python
+from torchvision.datasets import CIFAR10
+import torchvision
+from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
+
+test_data = CIFAR10(root="./torch_vision_dataset", train=False, transform=torchvision.transforms.ToTensor())
+#得到CIFAR10数据集，同时对数据进行tensor化
+test_data_loader = DataLoader(test_data, batch_size=64, shuffle=True, num_workers=0, drop_last=True)
+#得到一个DataLoader,batch_size设置为64，表示一次处理64张照片
+
+# test_data中的第一张照片
+#image, target = test_data[0]
+#print(image)
+#print(image.shape)  # torch.Size([3, 32, 32])
+#print(target)
+
+# Dataloader
+writer = SummaryWriter("Dataloader")
+for epoch in range(2):
+    step = 0
+    for data in test_data_loader:
+        images, targets = data
+        # print(images.shape)  # torch.Size([4, 3, 32, 32]) 4表示一个batch里面有四张照片
+        # print(targets)  # tensor([6, 4, 7, 0])
+        writer.add_images("Epoch：{}".format(epoch), images, step)
+        # writer.add_images()表示加载多个照片
+        step += 1
+
+writer.close()
+```
+
+
+
+
 
 
 
@@ -673,13 +747,51 @@ for i in range(10):
 
 
 
+# TorchVision中数据集的简单使用
 
+导入数据集
 
+```python
+from torchvision.datasets import CIFAR10
+from torchvision import transforms
+dataset_transforms = transforms.Compose([
+    transforms.ToTensor()
+])
+train_set = CIFAR10(root="./torch_vision_dataset", transform=dataset_transforms, train=True, download=True)
+test_set = CIFAR10(root="./torch_vision_dataset", transform=dataset_transforms, train=False, download=True)
+```
 
+root表示存储地址
 
+transform表示要对数据进行什么样的操作
 
+train=True表示这是个训练集
 
+download=True表示要进行下载（如果已经下载了也不胡报错）
 
+```python
+print(test_set[0])  
+# (<PIL.Image.Image image mode=RGB size=32x32 at 0x1D6FD68EBC8>, 3)
+#前一部分表示图片,3表示的是图片类别（target）
+img, target = test_set[0]
+print(img)
+print(target)
+print(test_set.classes)
+```
+
+转换成tensor之后就可以用tensorboard查看照片了
+
+```python
+writer = SummaryWriter("P10")
+for i in range(100):
+    image, target = train_set[i]
+    writer.add_image("CIFAR10_train_Set", image, i)
+writer.close()
+```
+
+<center class="half">
+    <img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131730154.png" alt="image-20220513173043110" style="zoom:40%;" /><img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131729402.png" alt="image-20220513172959359" style="zoom:40%;" />
+</center>
 
 
 
