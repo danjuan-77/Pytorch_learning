@@ -427,7 +427,7 @@ writer.add_image("Image",img,1,dataformats="HWC")
 
 > 使用Transforms实现对图形的变换
 
-* 如何使用transforms
+* ## 如何使用transforms
 
 整体的结构
 
@@ -486,9 +486,190 @@ tool=transforms.Totensor()
 tensor_img=tool(img_path)
 ```
 
+几个常用工具的功能：
+
+```python
+from PIL import Image
+from torchvision import transforms
+from torch.utils.tensorboard import SummaryWriter
+
+image_path = "Images/wallhaven.jpg"
+
+writer = SummaryWriter("logs")
+image = Image.open(image_path)  # PIl数据类型
+print(image)
+```
+
+## ToTensor
+
+```python
+# Totensor
+trans_totensor = transforms.ToTensor()  # 实例化Totensor
+tensor_image = trans_totensor(image)  # 将PIL数据类型的照片装换成tensor类型
+writer.add_image("Totensor", tensor_image)
+```
+
+## Resize
+
+> 修改图片的尺寸
+>
+> * Resize((x,y)) 将长宽裁剪成（x,y）大小
+> * Resize(x)将较短边裁剪成x，较长边进行“长宽比不变”的缩放
+
+```python
+# Resize
+trans_Resize = transforms.Resize(512)  # 实例化一个Resize，参数是照片的大小，如果resize(512)表示将最短边调整至512，长宽比不变
+# resize_image = trans_Resize(image)
+resize_image = trans_Resize(tensor_image)  # 对image进行resize
+writer.add_image("Resize", resize_image, 1)
+```
+
+（x,y）型裁剪：
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131446058.png" alt="image-20220513144558856" style="zoom:50%;" />
+
+长宽比不变裁剪:
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131446290.png" alt="image-20220513144649175" style="zoom: 50%;" />
+
+## Nomalize
+
+> ## 归一化定义与作用
+>
+>   ==**归一化**就是要把需要处理的数据经过处理后（通过某种算法）限制在你需要的一定范围内。==首先归一化是为了后面数据处理的方便，其次是保证程序运行时收敛加快。归一化的具体作用是归纳统一样本的统计分布性。归一化在0-1之间是统计的概率分布，归一化在某个区间上是统计的坐标分布。归一化有同一、统一和合一的意思。
+>
+>   **归一化的目的**简而言之，是使得没有可比性的数据变得具有可比性，同时又保持相比较的两个数据之间的相对关系，如大小关系；或是为了作图，原来很难在一张图上作出来，归一化后就可以很方便的给出图上的相对位置等。
+>
+>   在使用机器学习算法的数据预处理阶段，归一化也是非常重要的一个步骤。例如在应用SVM之前，缩放是非常重要的。Sarle的神经网络FAQ的第二部分（1997）阐述了缩放的重要性，大多数注意事项也适用于SVM。缩放的最主要**优点是能够避免大数值区间的属性过分支配了小数值区间的属性**。另一个优点能**避免计算过程中数值复杂度**。因为关键值通常依赖特征向量的内积（inner products），例如，线性核和多项式核，属性的大数值可能会导致数值问题。我们推荐将每个属性线性缩放到区间[-1,+1]或者[0, 1]。
+>
+>   当然，我们**必须使用同样的方法缩放训练数据和测试数据。**例如，假设我们把训练数据的第一个属性从[-10,+10]缩放到[-1, +1]，那么如果测试数据的第一个属性属于区间[-11, +8]，我们必须将测试数据转变成[-1.1, +0.8]。
+
+```python
+class Normalize(torch.nn.Module):
+    """Normalize a tensor image with mean and standard deviation.
+    This transform does not support PIL Image.
+    Given mean: ``(mean[1],...,mean[n])`` and std: ``(std[1],..,std[n])`` for ``n``
+    channels, this transform will normalize each channel of the input
+    ``torch.*Tensor`` i.e.,
+    ``output[channel] = (input[channel] - mean[channel]) / std[channel]``
+
+    .. note::
+        This transform acts out of place, i.e., it does not mutate the input tensor.
+
+    Args:
+        mean (sequence): Sequence of means for each channel.
+        std (sequence): Sequence of standard deviations for each channel.
+        inplace(bool,optional): Bool to make this operation in-place.
+
+    """
+```
+
+这个类的构造函数是：
+
+```python
+    def __init__(self, mean, std, inplace=False):
+        super().__init__()
+        _log_api_usage_once(self)
+        self.mean = mean
+        self.std = std
+        self.inplace = inplace
+```
+
+主要有两个参数：
+
+mean=平均数
+
+std=标准差
+
+```python
+# Nomalize
+
+trans_nomalize = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])  # 实例化Nomalize，初始化的参数就是平均值和标准差
+nomal_image = trans_nomalize(tensor_image)
+writer.add_image("Nomalize", nomal_image, 1)
+print(tensor_image[0][0][0])  # 比较标准化之后的数据区别
+print(nomal_image[0][0][0])
+```
+
+可以看到进行归一化之后的图片：
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131450810.png" alt="image-20220513145046702" style="zoom:50%;" />
+
+## Compose
+
+```python
+class Compose:
+    """Composes several transforms together. This transform does not support torchscript.
+    Please, see the note below.
+
+    Args:
+        transforms (list of ``Transform`` objects): list of transforms to compose.
+
+    Example:
+        >>> transforms.Compose([
+        >>>     transforms.CenterCrop(10),
+        >>>     transforms.PILToTensor(),
+        >>>     transforms.ConvertImageDtype(torch.float),
+        >>> ])
+
+    .. note::
+        In order to script the transformations, please use ``torch.nn.Sequential`` as below.
+
+        >>> transforms = torch.nn.Sequential(
+        >>>     transforms.CenterCrop(10),
+        >>>     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        >>> )
+        >>> scripted_transforms = torch.jit.script(transforms)
+
+        Make sure to use only scriptable transformations, i.e. that work with ``torch.Tensor``, does not require
+        `lambda` functions or ``PIL.Image``.
+
+    """
+```
+
+Compose的参数是transforms，这个工具的作用是，将多个tansforms可以组合在一起，让"输入"依次经过Compose组合的transforms工具的操作，得到一个最终的输出
+
+eg:
+
+```python
+# Compose(Resize+totensor)
+trans_Resize_2 = transforms.Resize(720)
+# Compose的作用是将多个transforms结合在一起diy一个流水线式工具[trans1,trans2...]让image依次经过不同的transforms，上一个transforms的输出就是下一个的输入
+trans_compose = transforms.Compose([trans_Resize_2, trans_totensor])  # PIL Image-->PIL Image-->Tensor
+resize_image_2 = trans_compose(image)
+writer.add_image("Resize", resize_image_2, 2)
+```
+
+在这里我们将Resize和Totensor进行组合
+
+首先我们将PIL Image输入，经过Resize得到缩放后的PIL Image，然后经过Totensor得到向量化之后的图片
+
+这个就是一个==流水线式工作==
 
 
 
+
+
+## RandomCrop
+
+> 随机裁剪
+
+```python
+# RandomCrop
+trans_randomcrop = transforms.RandomCrop(512)  # 随机得到一个短边修剪到512，长宽比不变的图像
+trans_compose_2 = transforms.Compose([trans_randomcrop, trans_totensor])# 将RamdomCrop和Totensor结合起来，最终得到tensor数据类型
+for i in range(10):
+    randomcrop_image = trans_compose_2(image)
+    writer.add_image("RandomCrop", randomcrop_image, i)
+```
+
+得到的结果：
+<center>
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131457682.png" alt="image-20220513145718538" style="zoom:33%;" />
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131457852.png" alt="image-20220513145726716" style="zoom:33%;" />
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131457926.png" alt="image-20220513145732772" style="zoom:33%;" />
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205131457339.png" alt="image-20220513145746191" style="zoom:33%;" />
+</center>
 
 
 
