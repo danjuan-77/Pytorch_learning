@@ -794,14 +794,184 @@ writer.close()
 </center>
 
 
+# 神经网络构建nn.Module
+
+使用nn.Module来构建自己的自定义网络
+
+```python
+from torch import nn
+
+class net(nn.Module):#首先要继承nn.Module这个类
+	def __init__(self):
+		super().__init__()#初始化必须先要使用父类的初始化
+		
+	def forward(self,x):
+		#code
+```
+
+## 卷积操作(nn.functional)
+
+nn里面有一些函数是包含在nn.functional中的
+
+![image-20220517031905674](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170319724.png)
+
+==Convolution functions==卷积函数
+
+![image-20220517031954229](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170319271.png)
+
+分别是一维，二维，三维的卷积函数
+
+conv2d
+
+> Parameters//一些参数
+
+![image-20220517032314683](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170323728.png)
+
+input就是输入数据,对他的shape是有要求的分别是(batch_size,通道数,高度,宽度)
+
+weight可以说是权重,也可以说是卷积核,同样的对他的shape是有要求的
+
+bias就是偏置项
+
+stride就是步长(可以观察卷积函数计算过程就知道是怎么一回事了)
+
+padding就是填充,striding=1,就是将原始数据的周围填充一层0
+
+![image-20220517032638999](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170326061.png)
+
+填充之后
+
+![image-20220517032658815](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170326863.png)
+
+代码尝试:
+
+```python
+import torch
+from torch import nn
+import torch.nn.functional as F
+
+input = torch.tensor([[1, 2, 0, 3, 1],
+                      [0, 1, 2, 3, 1],
+                      [1, 2, 1, 0, 0],
+                      [5, 2, 3, 1, 1],
+                      [2, 1, 0, 1, 1]])
+
+kernal = torch.tensor([[1, 2, 1],
+                       [0, 1, 0],
+                       [2, 1, 0]])
+
+input = torch.reshape(input, (1, 1, 5, 5))
+kernal = torch.reshape(kernal, (1, 1, 3, 3))
+
+output = F.conv2d(input, kernal, stride=1, padding=0)
+print(output)
+```
+
+运行结果:
+
+![image-20220517033353587](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170333638.png)
+
+```python
+output2 = F.conv2d(input, kernal, stride=2, padding=0)
+print(output2)
+```
+
+![image-20220517033439724](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170334780.png)
+
+```python
+output3 = F.conv2d(input, kernal, stride=1, padding=1)
+print(output3)
+```
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170335331.png" alt="image-20220517033529284" style="zoom:67%;" />
+
+![image-20220517034051571](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205170340655.png)
+
+ 
+
+## 神经网络卷积层（nn）
+
+![image-20220517174239057](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205171743451.png)
+
+几个重要的参数
+
+![image-20220517174501113](https://raw.githubusercontent.com/danjuan-77/picgo/main/202205171745192.png)
+
+in_channels 表示输入的数据的通道数量
+
+out_channels 表示输出的数据的通道数量
+
+kernel_size表示你的卷积核的尺寸
+
+stride表示每次的步长
+
+padding表示周围填充
+
+padding_mode表示按照什么样的方式填充
 
 
 
+代码实战：
+
+```python
+import torch
+import torchvision
+from torch import nn
+from torch.nn import Conv2d
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+# 得到数据
+dataset = torchvision.datasets.CIFAR10(root="./conv2d_dataset", train=False,
+                                       transform=torchvision.transforms.ToTensor(),
+                                       download=True)
+# 构建dataloader
+dataloader = DataLoader(dataset, batch_size=64)
 
 
+# 自定义卷积层
+class my_Conv2d(nn.Module):
+    def __init__(self):
+        super(my_Conv2d, self).__init__()  # 初始化父类
+        # 自定义一个卷积函数
+        self.conv2d = Conv2d(in_channels=3, out_channels=6, kernel_size=(3, 3), stride=(1, 1), padding=0)
+
+    def forward(self, x):
+        x = self.conv2d(x)
+        return x
 
 
+# 得到一个卷积层对象
+my_conv2d = my_Conv2d()
+writer = SummaryWriter("Conv2d")
+step = 0
+for data in dataloader:
+    images, targets = data
+    output = my_conv2d(images)
+    print(images.shape)  # torch.Size([64, 3, 32, 32])
+    print(output.shape)  # torch.Size([64, 6, 30, 30])
+    writer.add_images("Input", images, step)
+    output = torch.reshape(output, [-1, 3, 30, 30])
+    # 因为tensorboard不知道怎么去显示六个通道的图片，所以要进行reshape得到三通道图片
+    # [-1,xx,xx,xx] 用-1就能让他自己计算决定多少个batch_size
+    writer.add_images("Output", output, step)
+    step += 1
+writer.close()
+```
 
+将输出的图片加入到tensorboard中，要注意图片的通道数量
+
+```python
+output = torch.reshape(output, [-1, 3, 30, 30])
+```
+
+因为tensorboard不知道显示六通道数据
+
+所以我们将他变成3通道的输出，这样就会改变batch_size的值，也就是说，通道数变少了，那就会把多出来的那几个通道，用多个batch_size显示出来
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205171824432.png" alt="image-20220517182458352" style="zoom:50%;" />
+
+<img src="https://raw.githubusercontent.com/danjuan-77/picgo/main/202205171825254.png" alt="image-20220517182514154" style="zoom:50%;" />
 
 
 
